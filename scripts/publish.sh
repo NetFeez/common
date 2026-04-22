@@ -8,12 +8,12 @@ set -euo pipefail
 
 bash scripts/compile.sh
 
-echo -e "\x1B[36m====== No publishes before refactor tests process ====== \x1B[0m";
-exit 1
+# echo -e "\x1B[36m====== No publishes before refactor tests process ====== \x1B[0m";
+# exit 1
 
 # ====== Main Process ======
 
-if [[ "$1" == "--dev" ]]; then
+if [[ "${1:-}" == "--dev" ]]; then
   echo -e "\x1B[37mPublishing with tag 'dev'...\x1B[0m";
   if npm publish --tag dev; then
     echo -e "\x1B[32mDev publish completed successfully!\x1B[0m";

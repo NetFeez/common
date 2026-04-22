@@ -31,7 +31,7 @@ export class Time {
      * @param format - The format string containing placeholders to be replaced with date components.
      * @returns A formatted date string with the placeholders replaced by their corresponding values.
      */
-    public static format(format: string, date: Date | number | string): string {
+    public static format(format: string, date?: Date | number | string): string {
         const vDate = new _Date(date);
         return vDate.format(format);
     }
