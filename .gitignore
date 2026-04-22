@@ -10,3 +10,7 @@
 
 # Work space setting to Project IDX
 !.vscode/
+
+# Git and GitHub setting
+!.github
+!.gitignore
