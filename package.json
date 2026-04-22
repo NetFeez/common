@@ -1,0 +1,28 @@
+{
+  "name": "@netfeez/common",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "The universal core of the NetFeez ecosystem. Agnostic utilities and schema validation for Vortez (Server) and Vizui (Web).",
+  "license": "Apache-2.0",
+  "author": {
+    "name": "NetFeez",
+    "email": "netfeez.dev@gmail.com",
+    "url": "https://github.com/NetFeez"
+  },
+  "main": "build/index.js",
+  "scripts": {
+    "publish": "bash scripts/publish.sh",
+    "compile": "bash scripts/compile.sh",
+    "dev": "bash scripts/dev.sh",
+    "dev.publish": "bash scripts/publish.sh --dev"
+  },
+  "files": [
+    "package.json",
+    "README.md",
+    "LICENSE",
+    "build"
+  ],
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}
