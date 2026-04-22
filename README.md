@@ -45,6 +45,82 @@ Coming soon:
 npm install @netfeez/common
 ```
 
+### Node.js (Recommended)
+
+After installing, simply import and use any utility:
+
+```ts
+import { Events } from '@netfeez/common';
+```
+No extra configuration is needed for Node.js environments.
+
+### Web Browsers
+
+You can use @netfeez/common in the browser in two main ways:
+
+#### 1. Using CDN (Import Map)
+
+Add this to your HTML:
+
+```html
+<script type="importmap">
+{
+  "imports": {
+    "@netfeez/common": "https://netfeez.github.io/common/v1.0.3/common.js",
+    "@netfeez/common/": "https://netfeez.github.io/common/v1.0.3/"
+  }
+}
+</script>
+```
+
+Then import in your code:
+
+```ts
+import { Events } from '@netfeez/common';
+```
+
+#### 2. Using Local Files (Local Import Map)
+
+Download the compiled files from the [releases](https://github.com/NetFeez/common/releases) or CDN and place them in your project. Then configure your import map to point to your local copy:
+
+```html
+<script type="importmap">
+{
+  "imports": {
+    "@netfeez/common": "/path-to-your-copy/common.js",
+    "@netfeez/common/": "/path-to-your-copy/"
+  }
+}
+</script>
+```
+
+You can then import as usual:
+
+```ts
+import { Events } from '@netfeez/common';
+```
+
+#### TypeScript Typings for Browser Projects
+
+If you use TypeScript in the browser and do not install the package with npm, you can add typings support via `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "paths": {
+      "@netfeez/common": ["./path-to-your-copy/common.js"],
+      "@netfeez/common/*": ["./path-to-your-copy/*"]
+    }
+  }
+}
+```
+
+This only affects TypeScript type checking and editor autocompletion; it does not affect how modules are loaded in the browser.
+
+**Note:** If you install with npm in a web project, it is only recommended for TypeScript typings, not for loading the code in the browser.
+
+**Recommendation:** For production, host your own copy of the compiled files to ensure stability and version control.
+
 ---
 
 ## 📄 License
