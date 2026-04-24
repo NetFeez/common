@@ -66,8 +66,8 @@ Add this to your HTML:
 <script type="importmap">
 {
   "imports": {
-    "@netfeez/common": "https://netfeez.github.io/common/v2.0.0/common.js",
-    "@netfeez/common/": "https://netfeez.github.io/common/v2.0.0/"
+    "@netfeez/common": "https://netfeez.github.io/common/v2.0.1/common.js",
+    "@netfeez/common/": "https://netfeez.github.io/common/v2.0.1/"
   }
 }
 </script>
