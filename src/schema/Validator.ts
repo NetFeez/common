@@ -27,14 +27,22 @@ export class Validator {
      * @param prop The property definition to validate
      * @param key The key of the property, used for error messages
      */
-    public static validateProperty(prop: Schema.property, key: string): void {
-        switch(prop.type) {
-            case 'string': this.validateStringProperty(prop, key); break;
-            case 'number': this.validateNumberProperty(prop, key); break;
-            case 'boolean': break;
-            case 'array': this.validateArrayProperty(prop, key); break;
-            case 'object': this.validateObjectProperty(prop, key); break;
-            default: throw new SchemaError(`Unknown type for property '${key}'`);
+    public static validateProperty(prop: Schema.property | Schema.multiProperty, key: string): void {
+        if ('union' in prop) {
+            if (!Array.isArray(prop.union) || prop.union.length === 0) throw new SchemaError(`Property '${key}' union must be a non-empty array`);
+            for (const index in prop.union) {
+                const subProp = prop.union[index];
+                this.validateProperty(subProp, `${key}.union[${index}]`);
+            }
+        } else {
+            switch(prop.type) {
+                case 'string': this.validateStringProperty(prop, key); break;
+                case 'number': this.validateNumberProperty(prop, key); break;
+                case 'boolean': break;
+                case 'array': this.validateArrayProperty(prop, key); break;
+                case 'object': this.validateObjectProperty(prop, key); break;
+                default: throw new SchemaError(`Unknown type for property '${key}'`);
+            }
         }
         if ('default' in prop) this.validateDefaultValue(prop, key);
     }
@@ -43,23 +51,9 @@ export class Validator {
      * @param prop The property definition to validate against
      * @param key The key of the property, used for error messages
      */
-    public static validateDefaultValue(prop: Schema.property, key: string) {
-        if (prop.default === undefined) {
-            if (!prop.required) return;
-            throw new SchemaError(`Property '${key}' default value cannot be undefined`)
-        }
-        if (prop.default === null) {
-            if (prop.nullable) return;
-            throw new SchemaError(`Property '${key}' default value cannot be null`);
-        }
-        switch (prop.type) {
-            case 'string': this.validateString(prop.default, prop, key); break;
-            case 'number': this.validateNumber(prop.default, prop, key); break;
-            case 'boolean': this.validateBoolean(prop.default, prop, key); break;
-            case 'array': this.validateArray(prop.default, prop, key); break;
-            case 'object': this.validateObject(prop.default, prop, key); break;
-            default: throw new SchemaError(`Unknown type for property '${key}'`);
-        }
+    public static validateDefaultValue(prop: Schema.property | Schema.multiProperty, key: string) {
+        try { this.validateValue(prop.default, prop, `${key}(default)`); }
+        catch (error: any) { throw new SchemaError(`Invalid default value for property '${key}': ${error.message}`); }
     }
     /**
      * Validates a string property definition, used for validating nested objects.
@@ -101,7 +95,7 @@ export class Validator {
         if (prop.maximum !== undefined && prop.minimum !== undefined && prop.maximum < prop.minimum) {
             throw new SchemaError(`Property '${key}' maximum must be greater than or equal to minimum`);
         }
-        this.validateProperty(prop.property, `${key}[]`);
+        this.validateProperty(prop.items, `${key}[]`);
     }
     /**
      * Validates an object property definition, used for validating nested objects.
@@ -109,7 +103,7 @@ export class Validator {
      * @param key The key of the property, used for error messages
      */
     public static validateObjectProperty(prop: Schema.Property.Object, key: string): void {
-        this.validateStructure(prop.schema, key);
+        this.validateStructure(prop.properties, key);
     }
     /**
      * Validates a string value against a string property definition, used for validating default values and nested objects.
@@ -170,7 +164,7 @@ export class Validator {
         if (typeof value !== 'object' || Array.isArray(value)) {
             throw new SchemaError(`Property ${key} must be an object`);
         }
-        this.validateStructure(prop.schema, key);
+        this.validateStructure(prop.properties, key);
     }
     /**
      * Validates an array value against an array property definition, used for validating default values and array items.
@@ -188,7 +182,7 @@ export class Validator {
             throw new SchemaError(`Property ${key} must have at most ${prop.maximum} items`);
         }
         value.forEach((item, index) => {
-            this.validateValue(item, prop.property, `${key}[${index}]`);
+            this.validateValue(item, prop.items, `${key}[${index}]`);
         });
     }
     /**
@@ -197,7 +191,21 @@ export class Validator {
      * @param prop The property definition to validate against
      * @param key The key of the property, used for error messages
      */
-    public static validateValue(value: any, prop: Schema.property, key: string) {
+    public static validateValue(value: any, prop: Schema.property | Schema.multiProperty, key: string) {
+        if (value === undefined || value === null) {
+            if (value === null && prop.nullable) return;
+            if (value === undefined && !('required' in prop && prop.required)) return;
+            throw new SchemaError(`Property ${key} cannot be ${value}`);
+        }
+        if ('union' in prop) {
+            const errors: string[] = [];
+            const isValid = prop.union.some((subProp) => {
+                try { this.validateValue(value, subProp, key); return true; }
+                catch (e: any) { errors.push(e.message); return false; }
+            });
+            if (isValid) return;
+            throw new SchemaError(`Property '${key}' value does not match any allowed type in union. Errors: [${errors.join(' | ')}]`);
+        }
         switch (prop.type) {
             case 'string': this.validateString(value, prop, key); break;
             case 'number': this.validateNumber(value, prop, key); break;
