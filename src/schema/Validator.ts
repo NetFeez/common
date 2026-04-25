@@ -103,6 +103,7 @@ export class Validator {
      * @param key The key of the property, used for error messages
      */
     public static validateObjectProperty(prop: Schema.Property.Object, key: string): void {
+        if (!prop.properties) return;
         this.validateStructure(prop.properties, key);
     }
     /**
@@ -164,6 +165,7 @@ export class Validator {
         if (typeof value !== 'object' || Array.isArray(value)) {
             throw new SchemaError(`Property ${key} must be an object`);
         }
+        if (!prop.properties) return;
         this.validateStructure(prop.properties, key);
     }
     /**

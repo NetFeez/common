@@ -104,32 +104,56 @@ export class Schema<const S extends Schema.Schema> {
     ): Partial<Schema.Flatten<this['schema']>> & Partial<Schema.Infer<this['schema']>> & Schema.Document;
     public processPartialData(data: any): Partial<Schema.Flatten<this['schema']>> & Partial<Schema.Infer<this['schema']>> & Schema.Document {
         const result: any = {};
-        let currentProp: Schema.property | Schema.multiProperty;
+
         for (const key in data) {
             const value = this.isKeyOf(data, key) ? data[key] : undefined;
-
-            const subKeys = key.split('.');
-            const firstKey = subKeys.shift();
-            if (!firstKey || !(firstKey in this.schema)) throw new Schema.SchemaError(`Unknown property ${firstKey}`);
-
-            currentProp = this.schema[firstKey];
-
-            let usedKeys: string[] = []
-
-            for (const subKey of subKeys) {
-                if ('union' in currentProp) {
-                    const fount = currentProp.union.find(p => p.type === 'object' && subKey in p.properties);
-                    if (!fount) throw new Schema.SchemaError(`Property ${subKey} not found in any union type at ${key}`);
-                    currentProp = fount;
-                } else if (currentProp.type === 'object') {
-                    if (!(subKey in currentProp.properties)) throw new Schema.SchemaError(`Unknown property ${subKey} at ${key}`);
-                    currentProp = currentProp.properties[subKey];
-                } else throw new Schema.SchemaError(`Property ${firstKey}.${usedKeys.join('.')} is not an object, cannot access sub-property ${subKey}`);
-            }
-            result[key] = this.processProperty(value, currentProp, key);
+            const { prop, isOpen } = this.navigatePath(key);
+            result[key] = isOpen ? value : this.processProperty(value, prop, key);
             if (result[key] === undefined) delete result[key];
         }
+
         return result;
+    }
+    /**
+     * navigate a path in the schema and return the property at the end of the path, along with a boolean indicating if the property is part of an open object (i.e., an object without defined properties, allowing any keys).
+     * @param path the path to navigate, using dot notation for nested properties (e.g., "user.address.street")
+     * @returns an object containing the property at the end of the path and a boolean indicating if it's part of an open object
+     * @throws SchemaError if any part of the path is invalid (e.g., accessing a sub-property of a non-object, or a property that doesn't exist)
+     * 
+     * This method is used internally for processing partial data with dot notation, allowing it to correctly identify properties even when they are nested within unions or open objects.
+     */
+    protected navigatePath(path: string): Schema.NavigationResult {
+        const subKeys = path.split('.');
+        const firstKey = subKeys.shift();
+
+        if (!firstKey || !(firstKey in this.schema)) throw new Schema.SchemaError(`Unknown property ${firstKey}`);
+
+        let currentProp: Schema.property | Schema.multiProperty = this.schema[firstKey];
+        let usedKeys: string[] = [];
+        let isOpen = false;
+
+        for (const subKey of subKeys) {
+            if ('union' in currentProp) {
+                let foundChild: Schema.property | Schema.multiProperty | undefined;
+                let openObjectFound: Schema.Property.Object | undefined;
+
+                for (const p of currentProp.union) {
+                    if (p.type !== 'object') continue;
+                    if (!p.properties) { openObjectFound = p; continue; }
+                    if (subKey in p.properties) { foundChild = p.properties[subKey]; break; }
+                }
+
+                if (foundChild) currentProp = foundChild;
+                else if (openObjectFound) { currentProp = openObjectFound; isOpen = true; break;}
+                else throw new Schema.SchemaError(`Property ${subKey} not found in any union type at ${path}`);
+            } else if (currentProp.type === 'object') {
+                if (!currentProp.properties) { isOpen = true; break; }
+                if (!(subKey in currentProp.properties)) throw new Schema.SchemaError(`Unknown property ${subKey} at ${path}`);
+                currentProp = currentProp.properties[subKey];
+            } else throw new Schema.SchemaError(`Property ${firstKey}${usedKeys.length ? '.' + usedKeys.join('.') : ''} is not an object, cannot access sub-property ${subKey}`);
+            usedKeys.push(subKey);
+        }
+        return { prop: currentProp, isOpen };
     }
     /**
      * process a property
@@ -186,6 +210,7 @@ export class Schema<const S extends Schema.Schema> {
      * @throws schemaError if the data is not valid
      */
     protected processObject(value: any, prop: Schema.Property.Object, key: string, partial: boolean = false): any {
+        if (!prop.properties) return value; 
         const handler = new Schema(prop.properties);
         try { return handler.processData(value, partial); }
         catch (error) { throw new Schema.SchemaError(`Property ${key} is not valid: ${error}`); }
@@ -253,6 +278,10 @@ export namespace Schema {
     export type FlattenToProcess<S extends Schema.Schema> = (
         Flatten.Object<Infer.schemaToProcess<S>, 10>
     );
+    export interface NavigationResult {
+        prop: Schema.property | Schema.multiProperty,
+        isOpen: boolean
+    }
     export interface Document {
         [Key: string]: any;
     }
@@ -295,7 +324,7 @@ export namespace Schema {
         }
         export interface Boolean extends Base<'boolean'> {}
         export interface Object extends Base<'object'> {
-            properties: Schema;
+            properties?: Schema;
         }
         export interface Array extends Base<'array'> {
             items: property;
@@ -319,7 +348,7 @@ export namespace Schema {
         default?: Infer.propertyType<T, 'complete'> | null;
     }
     export interface Schema {
-        [Key: string]: property | multiProperty<any>;
+        [Key: string]: property | multiProperty;
     }
     export namespace Infer {
         export type Mode = 'partial' | 'process' | 'complete';
@@ -341,7 +370,12 @@ export namespace Schema {
             P extends Property.Number  ? number  :
             P extends Property.Boolean ? boolean :
             P extends Property.Object
-            ? ( ObjectByMode<P['properties'], M> )
+            ? (
+                // ObjectByMode<P['properties'], M>
+                P['properties'] extends Schema.Schema 
+                    ? ObjectByMode<P['properties'], M> 
+                    : Record<string, any>
+            )
             : P extends Property.Array
                 ? propertyType<P['items'], M>[]
                 :never

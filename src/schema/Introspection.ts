@@ -25,9 +25,15 @@ export class Introspection {
 
             if ('union' in prop) {
                 for (const subProp of prop.union) {
-                    if (subProp.type === 'object') uniques.push(...this.listUniques(subProp.properties, currentPath));
+                    if (subProp.type === 'object') {
+                        if (!subProp.properties) continue;
+                        uniques.push(...this.listUniques(subProp.properties, currentPath));
+                    }
                 }
-            } else if (prop.type === 'object') uniques.push(...this.listUniques(prop.properties, parentKey ? `${parentKey}.${key}` : key));
+            } else if (prop.type === 'object') {
+                if (!prop.properties) continue;
+                uniques.push(...this.listUniques(prop.properties, parentKey ? `${parentKey}.${key}` : key));
+            }
         }
         return uniques;
     }
@@ -36,10 +42,16 @@ export class Introspection {
      * @param schema The schema to convert to JSON Schema
      * @returns The JSON Schema representation of the input schema
      */
-    public static toJsonSchema(schema: Schema.Schema): JSONSchema.schema {
+    public static toJsonSchema(schema?: Schema.Schema): JSONSchema.schema {
+
         const sch: JSONSchema.schema = {};
         sch.type = 'object';
         sch.properties = {};
+
+        if (!schema) {
+            sch.additionalProperties = true;
+            return sch;
+        }
 
         for (const key in schema) {
             const prop = schema[key];
