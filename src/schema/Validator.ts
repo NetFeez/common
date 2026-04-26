@@ -16,9 +16,9 @@ export class Validator {
      * @param schema The schema to validate
      * @param parentKey The parent key of the schema, used for error messages
      */
-    public static validateStructure(schema: Schema.Schema, parentKey?: string) {
-        for (const key in schema) {
-            const prop = schema[key];
+    public static validateStructure(properties: Schema.Schema, parentKey?: string) {
+        for (const key in properties) {
+            const prop = properties[key];
             this.validateProperty(prop, parentKey ? `${parentKey}.${key}` : key);
         }
     }

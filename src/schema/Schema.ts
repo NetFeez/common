@@ -17,8 +17,8 @@ export { Validator } from './Validator.js';
 
 export class Schema<const S extends Schema.Schema> {
     constructor(
-        public readonly schema: S
-    ) { Schema.Validator.validateStructure(schema); }
+        public readonly properties: S
+    ) { Schema.Validator.validateStructure(properties); }
     /**
      * Get the inferred type of the schema.
      * 
@@ -34,8 +34,8 @@ export class Schema<const S extends Schema.Schema> {
      * 
      * @returns An empty object with the inferred type
      */
-    public get infer(): Schema.Infer<this['schema']> {
-        return {} as Schema.Infer<this['schema']>;
+    public get infer(): Schema.Infer<this['properties']> {
+        return {} as Schema.Infer<this['properties']>;
     }
     /**
      * Get the inferred type of the schema for processing (i.e., before applying defaults and handling optional properties).
@@ -50,8 +50,8 @@ export class Schema<const S extends Schema.Schema> {
      * DO NOT use the returned value at runtime - it's always an empty object.
      * This is purely a TypeScript type utility.
      */
-    public get inferToProcess(): Schema.InferToProcess<this['schema']> {
-        return {} as Schema.InferToProcess<this['schema']>;
+    public get inferToProcess(): Schema.InferToProcess<this['properties']> {
+        return {} as Schema.InferToProcess<this['properties']>;
     }
     /**
      * get the json schema as an object
@@ -75,14 +75,14 @@ export class Schema<const S extends Schema.Schema> {
      * @returns the processed data
      * @throws schemaError if the data is not valid
      */
-    public processData(data: Schema.Infer<this['schema']>, partial?: boolean): Schema.Infer<this['schema']>;
-    public processData(data: Schema.InferToProcess<this['schema']>, partial?: boolean): Schema.Infer<this['schema']>;
-    public processData(data: any, partial: boolean = false): Schema.Infer<this['schema']> {
+    public processData(data: Schema.Infer<this['properties']>, partial?: boolean): Schema.Infer<this['properties']>;
+    public processData(data: Schema.InferToProcess<this['properties']>, partial?: boolean): Schema.Infer<this['properties']>;
+    public processData(data: any, partial: boolean = false): Schema.Infer<this['properties']> {
         const result: any = {};
-        const iterable = partial ? data : this.schema;
+        const iterable = partial ? data : this.properties;
         for (const key in iterable) {
-            if (!this.isKeyOf(this.schema, key)) throw new Schema.SchemaError(`Unknown property ${String(key)}`);
-            const prop = this.schema[key];
+            if (!this.isKeyOf(this.properties, key)) throw new Schema.SchemaError(`Unknown property ${String(key)}`);
+            const prop = this.properties[key];
             const value = this.isKeyOf(data, key) ? data[key] : undefined;
             result[key] = this.processProperty(value, prop, key, partial);
             if (result[key] === undefined) delete result[key];
@@ -97,12 +97,12 @@ export class Schema<const S extends Schema.Schema> {
      * @throws schemaError if the data is not valid
      */
     public processPartialData(
-        data: Partial<Schema.FlattenToProcess<this['schema']>> & Partial<Schema.InferToProcess<this['schema']>> & Schema.Document,
-    ): Partial<Schema.Flatten<this['schema']>> & Partial<Schema.Infer<this['schema']>> & Schema.Document;
+        data: Partial<Schema.FlattenToProcess<this['properties']>> & Partial<Schema.InferToProcess<this['properties']>> & Schema.Document,
+    ): Partial<Schema.Flatten<this['properties']>> & Partial<Schema.Infer<this['properties']>> & Schema.Document;
     public processPartialData(
-        data: Partial<Schema.Flatten<this['schema']>> & Partial<Schema.Infer<this['schema']>> & Schema.Document,
-    ): Partial<Schema.Flatten<this['schema']>> & Partial<Schema.Infer<this['schema']>> & Schema.Document;
-    public processPartialData(data: any): Partial<Schema.Flatten<this['schema']>> & Partial<Schema.Infer<this['schema']>> & Schema.Document {
+        data: Partial<Schema.Flatten<this['properties']>> & Partial<Schema.Infer<this['properties']>> & Schema.Document,
+    ): Partial<Schema.Flatten<this['properties']>> & Partial<Schema.Infer<this['properties']>> & Schema.Document;
+    public processPartialData(data: any): Partial<Schema.Flatten<this['properties']>> & Partial<Schema.Infer<this['properties']>> & Schema.Document {
         const result: any = {};
 
         for (const key in data) {
@@ -126,9 +126,9 @@ export class Schema<const S extends Schema.Schema> {
         const subKeys = path.split('.');
         const firstKey = subKeys.shift();
 
-        if (!firstKey || !(firstKey in this.schema)) throw new Schema.SchemaError(`Unknown property ${firstKey}`);
+        if (!firstKey || !(firstKey in this.properties)) throw new Schema.SchemaError(`Unknown property ${firstKey}`);
 
-        let currentProp: Schema.property | Schema.multiProperty = this.schema[firstKey];
+        let currentProp: Schema.property | Schema.multiProperty = this.properties[firstKey];
         let usedKeys: string[] = [];
         let isOpen = false;
 
@@ -155,6 +155,30 @@ export class Schema<const S extends Schema.Schema> {
         }
         return { prop: currentProp, isOpen };
     }
+    protected applyDefaults(prop: Schema.property | Schema.multiProperty, key: string): any {
+        if ('default' in prop) return prop.default;
+        if ('union' in prop) {
+            for (const subProp of prop.union) {
+                try { return this.applyDefaults(subProp, key); }
+                catch { continue; }
+            }
+            if (prop.nullable) return null;
+            throw new Schema.SchemaError(`Property ${key} does not match any of the allowed types in the union`);
+        } else if (prop.type !== 'object' || !prop.properties) {
+            if (prop.nullable) return null;
+            if (prop.required) throw new Schema.SchemaError(`Property ${key} is required but not provided`);
+        } else {
+            if (!prop.properties) return {};
+            const handler = new Schema(prop.properties);
+            const result: any = {};
+            for (const subKey in prop.properties) {
+                const subProp = prop.properties[subKey];
+                const value = handler.applyDefaults(subProp, `${key}.${subKey}`);
+                if (value !== undefined) result[subKey] = value;
+            }
+            return result;
+        }
+    }
     /**
      * process a property
      * @param data the data to process
@@ -166,10 +190,8 @@ export class Schema<const S extends Schema.Schema> {
      */
     protected processProperty(data: any, prop: Schema.property | Schema.multiProperty, key: string, partial: boolean = false): any {
         if (data === undefined || data === null) {
-            if ('default' in prop) return prop.default;
-            if (prop.nullable) return null;
-            if (prop.required) throw new Schema.SchemaError(`Property ${key} is required but not provided`);
-            return undefined;
+            if (data === null && prop.nullable) return null;
+            return this.applyDefaults(prop, key);
         }
 
         if ('union' in prop) {
@@ -210,7 +232,7 @@ export class Schema<const S extends Schema.Schema> {
      * @throws schemaError if the data is not valid
      */
     protected processObject(value: any, prop: Schema.Property.Object, key: string, partial: boolean = false): any {
-        if (!prop.properties) return value; 
+        if (!prop.properties) return value;
         const handler = new Schema(prop.properties);
         let processed = handler.processData(value, partial);
         if (prop.allowAdditionalProperties === true) {
@@ -248,7 +270,7 @@ export class Schema<const S extends Schema.Schema> {
      * @returns a list of unique keys
     */
     protected listUniques(doc?: Schema.Schema, parentKey?: string): string[] {
-        const useDoc = doc ?? this.schema;
+        const useDoc = doc ?? this.properties;
         return Schema.Introspection.listUniques(useDoc, parentKey);
     }
     /**
@@ -257,7 +279,7 @@ export class Schema<const S extends Schema.Schema> {
      * @returns the JSON schema
     */
     protected toJsonSchema(schema?: Schema.Schema): Schema.JSONSchema.schema {
-        const useSchema = schema ?? this.schema;
+        const useSchema = schema ?? this.properties;
         return Schema.Introspection.toJsonSchema(useSchema);
     }
     /**
