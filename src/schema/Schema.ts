@@ -405,9 +405,10 @@ export namespace Schema {
             ? (
                 P['properties'] extends Schema.Schema 
                     ? (
-                        ObjectByMode<P['properties'], M> & P['allowAdditionalProperties'] extends true
+                        ObjectByMode<P['properties'], M> & ( P['allowAdditionalProperties'] extends true
                             ? { [key: string]: any }
                             : {}
+                        )
                     )
                     : Record<string, any>
             )
