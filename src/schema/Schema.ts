@@ -212,8 +212,17 @@ export class Schema<const S extends Schema.Schema> {
     protected processObject(value: any, prop: Schema.Property.Object, key: string, partial: boolean = false): any {
         if (!prop.properties) return value; 
         const handler = new Schema(prop.properties);
-        try { return handler.processData(value, partial); }
-        catch (error) { throw new Schema.SchemaError(`Property ${key} is not valid: ${error}`); }
+        let processed = handler.processData(value, partial);
+        if (prop.allowAdditionalProperties === true) {
+            processed = { ...value, ...processed };
+        } else if (prop.allowAdditionalProperties === false) {
+            for (const k in value) {
+                if (!(k in prop.properties)) {
+                    throw new Schema.SchemaError(`Unknown property ${k} at ${key}`);
+                }
+            }
+        }
+        return processed;
     }
     /**
      * validate a array
@@ -325,6 +334,7 @@ export namespace Schema {
         export interface Boolean extends Base<'boolean'> {}
         export interface Object extends Base<'object'> {
             properties?: Schema;
+            allowAdditionalProperties?: boolean
         }
         export interface Array extends Base<'array'> {
             items: property;
@@ -371,9 +381,12 @@ export namespace Schema {
             P extends Property.Boolean ? boolean :
             P extends Property.Object
             ? (
-                // ObjectByMode<P['properties'], M>
                 P['properties'] extends Schema.Schema 
-                    ? ObjectByMode<P['properties'], M> 
+                    ? (
+                        ObjectByMode<P['properties'], M> & P['allowAdditionalProperties'] extends true
+                            ? { [key: string]: any }
+                            : {}
+                    )
                     : Record<string, any>
             )
             : P extends Property.Array
