@@ -15,9 +15,9 @@ export { JSONSchema } from './JSONSchema.js';
 export { Introspection } from './Introspection.js';
 export { Validator } from './Validator.js';
 
-export class Schema<const S extends Schema.Schema> {
+export class Schema<const Prop extends Schema.PropertyMap> {
     constructor(
-        public readonly properties: S
+        public readonly properties: Prop
     ) { Schema.Validator.validateStructure(properties); }
     /**
      * Get the inferred type of the schema.
@@ -128,13 +128,13 @@ export class Schema<const S extends Schema.Schema> {
 
         if (!firstKey || !(firstKey in this.properties)) throw new Schema.SchemaError(`Unknown property ${firstKey}`);
 
-        let currentProp: Schema.property | Schema.multiProperty = this.properties[firstKey];
+        let currentProp: Schema.Property | Schema.MultiProperty = this.properties[firstKey];
         let usedKeys: string[] = [];
         let isOpen = false;
 
         for (const subKey of subKeys) {
             if ('union' in currentProp) {
-                let foundChild: Schema.property | Schema.multiProperty | undefined;
+                let foundChild: Schema.Property | Schema.MultiProperty | undefined;
                 let openObjectFound: Schema.Property.Object | undefined;
 
                 for (const p of currentProp.union) {
@@ -155,7 +155,7 @@ export class Schema<const S extends Schema.Schema> {
         }
         return { prop: currentProp, isOpen };
     }
-    protected applyDefaults(prop: Schema.property | Schema.multiProperty, key: string): any {
+    protected applyDefaults(prop: Schema.Property | Schema.MultiProperty, key: string): any {
         if ('default' in prop) return prop.default;
         if ('union' in prop) {
             for (const subProp of prop.union) {
@@ -188,7 +188,7 @@ export class Schema<const S extends Schema.Schema> {
      * @returns the processed data
      * @throws schemaError if the data is not valid
      */
-    protected processProperty(data: any, prop: Schema.property | Schema.multiProperty, key: string, partial: boolean = false): any {
+    protected processProperty(data: any, prop: Schema.Property | Schema.MultiProperty, key: string, partial: boolean = false): any {
         if (data === undefined || data === null) {
             if (data === null && prop.nullable) return null;
             return this.applyDefaults(prop, key);
@@ -269,7 +269,7 @@ export class Schema<const S extends Schema.Schema> {
      * @param parentKey the parent key of the schema
      * @returns a list of unique keys
     */
-    protected listUniques(doc?: Schema.Schema, parentKey?: string): string[] {
+    protected listUniques(doc?: Schema.PropertyMap, parentKey?: string): string[] {
         const useDoc = doc ?? this.properties;
         return Schema.Introspection.listUniques(useDoc, parentKey);
     }
@@ -278,7 +278,7 @@ export class Schema<const S extends Schema.Schema> {
      * @param schema the schema to convert
      * @returns the JSON schema
     */
-    protected toJsonSchema(schema?: Schema.Schema): Schema.JSONSchema.schema {
+    protected toJsonSchema(schema?: Schema.PropertyMap): Schema.JSONSchema.schema {
         const useSchema = schema ?? this.properties;
         return Schema.Introspection.toJsonSchema(useSchema);
     }
@@ -301,16 +301,16 @@ export namespace Schema {
     export import Introspection = _Introspection;
     export import Validator = _Validator;
 
-    export type Infer<S extends Schema> = Schema.Infer.schema<S>;
-    export type InferToProcess<S extends Schema> = Schema.Infer.schemaToProcess<S>;
-    export type Flatten<S extends Schema.Schema> = (
+    export type Infer<S extends PropertyMap> = Schema.Infer.schema<S>;
+    export type InferToProcess<S extends PropertyMap> = Schema.Infer.schemaToProcess<S>;
+    export type Flatten<S extends Schema.PropertyMap> = (
         Flatten.Object<Infer.schema<S>, 10>
     );
-    export type FlattenToProcess<S extends Schema.Schema> = (
+    export type FlattenToProcess<S extends Schema.PropertyMap> = (
         Flatten.Object<Infer.schemaToProcess<S>, 10>
     );
     export interface NavigationResult {
-        prop: Schema.property | Schema.multiProperty,
+        prop: Schema.Property | Schema.MultiProperty,
         isOpen: boolean
     }
     export interface Document {
@@ -355,11 +355,11 @@ export namespace Schema {
         }
         export interface Boolean extends Base<'boolean'> {}
         export interface Object extends Base<'object'> {
-            properties?: Schema;
+            properties?: PropertyMap;
             allowAdditionalProperties?: boolean
         }
         export interface Array extends Base<'array'> {
-            items: property;
+            items: Property;
             minimum?: number;
             maximum?: number;
         }
@@ -371,29 +371,29 @@ export namespace Schema {
             array: Array;
         }
     }
-    export type property = Property.Map[keyof Property.Map];
-    export interface multiProperty<T extends property = property> {
+    export type Property = Property.Map[keyof Property.Map];
+    export interface MultiProperty<T extends Property = Property> {
         union: T[];
         required?: boolean;
         nullable?: boolean;
         unique?: boolean;
         default?: Infer.propertyType<T, 'complete'> | null;
     }
-    export interface Schema {
-        [Key: string]: property | multiProperty;
+    export interface PropertyMap {
+        [Key: string]: Property | MultiProperty;
     }
     export namespace Infer {
         export type Mode = 'partial' | 'process' | 'complete';
 
-        type ObjectByMode<S extends Schema.Schema, M extends Mode> = (
+        type ObjectByMode<PMap extends Schema.PropertyMap, M extends Mode> = (
             M extends 'process'
-                ? schemaToProcess<S>
+                ? schemaToProcess<PMap>
                 : M extends 'partial'
-                    ? schemaPartial<S>
-                    : schema<S>
+                    ? schemaPartial<PMap>
+                    : schema<PMap>
         );
 
-        export type propertyType<P extends Schema.property, M extends Mode = 'complete'> = (
+        export type propertyType<P extends Schema.Property, M extends Mode = 'complete'> = (
             P extends Property.String
                 ? P extends { enum: readonly (infer E extends string)[] }
                     ? E
@@ -403,7 +403,7 @@ export namespace Schema {
             P extends Property.Boolean ? boolean :
             P extends Property.Object
             ? (
-                P['properties'] extends Schema.Schema 
+                P['properties'] extends Schema.PropertyMap 
                     ? (
                         ObjectByMode<P['properties'], M> & ( P['allowAdditionalProperties'] extends true
                             ? { [key: string]: any }
@@ -418,14 +418,14 @@ export namespace Schema {
         );
 
 
-        export type BaseType<P extends Schema.property | Schema.multiProperty, M extends Mode = 'complete'> = (
-            P extends { union: infer U extends Schema.property[] }
+        export type BaseType<P extends Schema.Property | Schema.MultiProperty, M extends Mode = 'complete'> = (
+            P extends { union: infer U extends Schema.Property[] }
                 ? propertyType<U[number], M>
-                : P extends Schema.property
+                : P extends Schema.Property
                     ? propertyType<P, M>
                     : never
         );
-        export type property<P extends Schema.property | Schema.multiProperty, M extends Mode = 'complete'> = (
+        export type property<P extends Schema.Property | Schema.MultiProperty, M extends Mode = 'complete'> = (
             Helper.HasDefault<P> extends true
                 ? (Helper.DefaultValue<P> extends null ? BaseType<P, M> | null : BaseType<P, M>)
                 : Helper.IsRequired<P> extends true
@@ -433,59 +433,46 @@ export namespace Schema {
                     : (Helper.IsNullable<P> extends true ? BaseType<P, M> | null : BaseType<P, M> | undefined)
         );
 
-        type MapProperty<P extends Schema.property | Schema.multiProperty, M extends Mode> = property<P, M>;
+        type MapProperty<P extends Schema.Property | Schema.MultiProperty, M extends Mode> = property<P, M>;
 
 
 
 
 
-        type RequiredKeys<S extends Schema> = {
-            [K in keyof S]: Helper.IsRequired<S[K]> extends true
+        type RequiredKeys<PMap extends PropertyMap> = {
+            [K in keyof PMap]: Helper.IsRequired<PMap[K]> extends true
                 ? K
-                : Helper.HasDefault<S[K]> extends true
+                : Helper.HasDefault<PMap[K]> extends true
                     ? K
                     : never;
-        }[keyof S];
+        }[keyof PMap];
 
-        type OptionalKeys<S extends Schema> = Exclude<keyof S, RequiredKeys<S>>;
+        type OptionalKeys<PMap extends PropertyMap> = Exclude<keyof PMap, RequiredKeys<PMap>>;
 
-        type RequiredToProcessKeys<S extends Schema> = {
-            [K in keyof S]: Helper.IsRequired<S[K]> extends true
-                ? Helper.HasDefault<S[K]> extends false ? K : never
+        type RequiredToProcessKeys<PMap extends PropertyMap> = {
+            [K in keyof PMap]: Helper.IsRequired<PMap[K]> extends true
+                ? Helper.HasDefault<PMap[K]> extends false ? K : never
                 : never;
-        }[keyof S];
+        }[keyof PMap];
 
-        type OptionalToProcessKeys<S extends Schema> = Exclude<keyof S, RequiredToProcessKeys<S>>;
+        type OptionalToProcessKeys<PMap extends PropertyMap> = Exclude<keyof PMap, RequiredToProcessKeys<PMap>>;
 
-        export type schema<S extends Schema> = Helper.Prettify<{
-            [K in RequiredKeys<S>]: MapProperty<S[K], 'complete'>;
+        export type schema<PMap extends PropertyMap> = Helper.Prettify<{
+            [K in RequiredKeys<PMap>]: MapProperty<PMap[K], 'complete'>;
         } & {
-            [K in OptionalKeys<S>]?: MapProperty<S[K], 'complete'>;
+            [K in OptionalKeys<PMap>]?: MapProperty<PMap[K], 'complete'>;
         }>;
-        export type schemaToProcess<S extends Schema> = Helper.Prettify<{
-            [K in RequiredToProcessKeys<S>]: MapProperty<S[K], 'process'>;
+        export type schemaToProcess<PMap extends PropertyMap> = Helper.Prettify<{
+            [K in RequiredToProcessKeys<PMap>]: MapProperty<PMap[K], 'process'>;
         } & {
-            [K in OptionalToProcessKeys<S>]?: MapProperty<S[K], 'process'>;
+            [K in OptionalToProcessKeys<PMap>]?: MapProperty<PMap[K], 'process'>;
         }>;
-        export type schemaPartial<S extends Schema> = Helper.Prettify<{
-            [K in keyof S]?: MapProperty<S[K], 'partial'>;
+        export type schemaPartial<PMap extends PropertyMap> = Helper.Prettify<{
+            [K in keyof PMap]?: MapProperty<PMap[K], 'partial'>;
         }>;
-        export type schemaBase<S extends Schema> = {
-            [K in keyof S]: MapProperty<S[K], 'complete'>;
+        export type schemaBase<PMap extends PropertyMap> = {
+            [K in keyof PMap]: MapProperty<PMap[K], 'complete'>;
         };
     }
-    const x = {
-        numberAndString: {
-            union: [
-                { type: 'number' },
-                { type: 'string' }
-            ], nullable: true
-        },
-        a: { type: 'string', default: 'world' }
-    } satisfies Schema.Schema;
-    type xType = Infer.schema<typeof x>;
-    //   ^?
-    type xTPType = Infer.schemaToProcess<typeof x>;
-    //   ^?
 }
 export default Schema;

@@ -16,7 +16,7 @@ export class Validator {
      * @param schema The schema to validate
      * @param parentKey The parent key of the schema, used for error messages
      */
-    public static validateStructure(properties: Schema.Schema, parentKey?: string) {
+    public static validateStructure(properties: Schema.PropertyMap, parentKey?: string) {
         for (const key in properties) {
             const prop = properties[key];
             this.validateProperty(prop, parentKey ? `${parentKey}.${key}` : key);
@@ -27,7 +27,7 @@ export class Validator {
      * @param prop The property definition to validate
      * @param key The key of the property, used for error messages
      */
-    public static validateProperty(prop: Schema.property | Schema.multiProperty, key: string): void {
+    public static validateProperty(prop: Schema.Property | Schema.MultiProperty, key: string): void {
         if ('union' in prop) {
             if (!Array.isArray(prop.union) || prop.union.length === 0) throw new SchemaError(`Property '${key}' union must be a non-empty array`);
             for (const index in prop.union) {
@@ -51,7 +51,7 @@ export class Validator {
      * @param prop The property definition to validate against
      * @param key The key of the property, used for error messages
      */
-    public static validateDefaultValue(prop: Schema.property | Schema.multiProperty, key: string) {
+    public static validateDefaultValue(prop: Schema.Property | Schema.MultiProperty, key: string) {
         try { this.validateValue(prop.default, prop, `${key}(default)`); }
         catch (error: any) { throw new SchemaError(`Invalid default value for property '${key}': ${error.message}`); }
     }
@@ -193,7 +193,7 @@ export class Validator {
      * @param prop The property definition to validate against
      * @param key The key of the property, used for error messages
      */
-    public static validateValue(value: any, prop: Schema.property | Schema.multiProperty, key: string) {
+    public static validateValue(value: any, prop: Schema.Property | Schema.MultiProperty, key: string) {
         if (value === undefined || value === null) {
             if (value === null && prop.nullable) return;
             if (value === undefined && !('required' in prop && prop.required)) return;

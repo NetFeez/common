@@ -15,7 +15,7 @@ export class Introspection {
      * @param parentKey The parent key of the current schema, used for building full paths of nested properties
      * @returns An array of full paths to unique properties in the schema
      */
-    public static listUniques(properties: Schema.Schema, parentKey?: string): string[] {
+    public static listUniques(properties: Schema.PropertyMap, parentKey?: string): string[] {
         const uniques: string[] = [];
         for (const key in properties) {
             const prop = properties[key];
@@ -42,7 +42,7 @@ export class Introspection {
      * @param schema The schema to convert to JSON Schema
      * @returns The JSON Schema representation of the input schema
      */
-    public static toJsonSchema(properties?: Schema.Schema): JSONSchema.schema {
+    public static toJsonSchema(properties?: Schema.PropertyMap): JSONSchema.schema {
         const sch: JSONSchema.schema = {};
         sch.type = 'object';
         sch.properties = {};
@@ -65,7 +65,7 @@ export class Introspection {
      * @param prop The property to convert to JSON Schema
      * @returns The JSON Schema representation of the input property
      */
-    protected static propertyToJsonSchema(prop: Schema.property | Schema.multiProperty): JSONSchema.schema {
+    protected static propertyToJsonSchema(prop: Schema.Property | Schema.MultiProperty): JSONSchema.schema {
         let subSch: JSONSchema.schema = {};
         if ('union' in prop) {
             subSch.anyOf = prop.union.map(sub => this.propertyToJsonSchema(sub));
