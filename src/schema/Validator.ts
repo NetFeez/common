@@ -60,7 +60,7 @@ export class Validator {
      * @param prop The string property definition to validate
      * @param key The key of the property, used for error messages
      */
-    public static validateStringProperty(prop: Schema.Property.String, key: string): void {
+    public static validateStringProperty(prop: Schema.Definition.String, key: string): void {
         if (prop.enum !== undefined) {
             if (!Array.isArray(prop.enum) || prop.enum.length === 0) {
                 throw new SchemaError(`Property '${key}' enum must be a non-empty array`);
@@ -81,7 +81,7 @@ export class Validator {
      * @param prop The number property definition to validate
      * @param key The key of the property, used for error messages
      */
-    public static validateNumberProperty(prop: Schema.Property.Number, key: string): void {
+    public static validateNumberProperty(prop: Schema.Definition.Number, key: string): void {
         if (prop.maximum !== undefined && prop.minimum !== undefined && prop.maximum < prop.minimum) {
             throw new SchemaError(`Property '${key}' maximum must be greater than or equal to minimum`);
         }
@@ -91,7 +91,7 @@ export class Validator {
      * @param prop The array property definition to validate
      * @param key The key of the property, used for error messages
      */
-    public static validateArrayProperty(prop: Schema.Property.Array, key: string): void {
+    public static validateArrayProperty(prop: Schema.Definition.Array, key: string): void {
         if (prop.maximum !== undefined && prop.minimum !== undefined && prop.maximum < prop.minimum) {
             throw new SchemaError(`Property '${key}' maximum must be greater than or equal to minimum`);
         }
@@ -102,7 +102,7 @@ export class Validator {
      * @param prop The object property definition to validate
      * @param key The key of the property, used for error messages
      */
-    public static validateObjectProperty(prop: Schema.Property.Object, key: string): void {
+    public static validateObjectProperty(prop: Schema.Definition.Object, key: string): void {
         if (!prop.properties) return;
         this.validateStructure(prop.properties, key);
     }
@@ -112,8 +112,8 @@ export class Validator {
      * @param prop The string property definition to validate against
      * @param key The key of the property, used for error messages
      */
-    public static validateString(value: string, prop: Schema.Property.String, key: string) {
-        if (value == null && prop.nullable === true) return;
+    public static validateString(value: string, prop: Schema.Definition.String, key: string) {
+        if (value === null && prop.nullable === true) return;
         if (typeof value !== 'string') throw new SchemaError(`Property ${key} must be a string`);
         if (prop.enum !== undefined && !prop.enum.includes(value)) {
             throw new SchemaError(`Property ${key} must be one of: ${prop.enum.join(', ')}`);
@@ -134,8 +134,8 @@ export class Validator {
      * @param prop The number property definition to validate against
      * @param key The key of the property, used for error messages
      */
-    public static validateNumber(value: number, prop: Schema.Property.Number, key: string) {
-        if (value == null && prop.nullable === true) return;
+    public static validateNumber(value: number, prop: Schema.Definition.Number, key: string) {
+        if (value === null && prop.nullable === true) return;
         if (typeof value !== 'number') throw new SchemaError(`Property ${key} must be a number`);
         if (prop.minimum !== undefined && value < prop.minimum) {
             throw new SchemaError(`Property ${key} must be greater than or equal to ${prop.minimum}`);
@@ -150,8 +150,8 @@ export class Validator {
      * @param prop The boolean property definition to validate against
      * @param key The key of the property, used for error messages
      */
-    public static validateBoolean(value: boolean, prop: Schema.Property.Boolean, key: string) {
-        if (value == null && prop.nullable === true) return;
+    public static validateBoolean(value: boolean, prop: Schema.Definition.Boolean, key: string) {
+        if (value === null && prop.nullable === true) return;
         if (typeof value !== 'boolean') throw new SchemaError(`Property ${key} must be a boolean`);
     }
     /**
@@ -160,8 +160,8 @@ export class Validator {
      * @param prop The object property definition to validate against
      * @param key The key of the property, used for error messages
      */
-    public static validateObject(value: any, prop: Schema.Property.Object, key: string) {
-        if (value == null && prop.nullable === true) return;
+    public static validateObject(value: any, prop: Schema.Definition.Object, key: string) {
+        if (value === null && prop.nullable === true) return;
         if (typeof value !== 'object' || Array.isArray(value)) {
             throw new SchemaError(`Property ${key} must be an object`);
         }
@@ -174,8 +174,8 @@ export class Validator {
      * @param prop The array property definition to validate against
      * @param key The key of the property, used for error messages
      */
-    public static validateArray(value: any, prop: Schema.Property.Array, key: string) {
-        if (value == null && prop.nullable === true) return;
+    public static validateArray(value: any, prop: Schema.Definition.Array, key: string) {
+        if (value === null && prop.nullable === true) return;
         if (!Array.isArray(value)) throw new SchemaError(`Property ${key} must be an array`);
         if (prop.minimum !== undefined && value.length < prop.minimum) {
             throw new SchemaError(`Property ${key} must have at least ${prop.minimum} items`);

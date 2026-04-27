@@ -15,24 +15,23 @@ export class Introspection {
      * @param parentKey The parent key of the current schema, used for building full paths of nested properties
      * @returns An array of full paths to unique properties in the schema
      */
-    public static listUniques(properties: Schema.PropertyMap, parentKey?: string): string[] {
+    public static listUniques(doc: Schema.Property | Schema.MultiProperty, parentKey?: string): string[] {
+        // Permite recibir tanto PropertyMap como Property/MultiProperty
         const uniques: string[] = [];
-        for (const key in properties) {
-            const prop = properties[key];
-            const currentPath = parentKey ? `${parentKey}.${key}` : key;
-            
-            if (key !== '_id' && prop.unique) uniques.push(parentKey ? `${parentKey}.${key}` : key);
-
-            if ('union' in prop) {
-                for (const subProp of prop.union) {
-                    if (subProp.type === 'object') {
-                        if (!subProp.properties) continue;
-                        uniques.push(...this.listUniques(subProp.properties, currentPath));
-                    }
-                }
-            } else if (prop.type === 'object') {
-                if (!prop.properties) continue;
-                uniques.push(...this.listUniques(prop.properties, parentKey ? `${parentKey}.${key}` : key));
+        // Si es un MultiProperty (union)
+        if ('union' in doc) {
+            for (const subProp of doc.union) {
+                uniques.push(...this.listUniques(subProp, parentKey));
+            }
+            return uniques;
+        }
+        // Si es un objeto con propiedades
+        if (doc.type === 'object' && doc.properties) {
+            for (const key in doc.properties) {
+                const prop = doc.properties[key];
+                const currentPath = parentKey ? `${parentKey}.${key}` : key;
+                if (key !== '_id' && prop.unique) uniques.push(currentPath);
+                uniques.push(...this.listUniques(prop, currentPath));
             }
         }
         return uniques;
@@ -42,68 +41,76 @@ export class Introspection {
      * @param schema The schema to convert to JSON Schema
      * @returns The JSON Schema representation of the input schema
      */
-    public static toJsonSchema(properties?: Schema.PropertyMap): JSONSchema.schema {
-        const sch: JSONSchema.schema = {};
-        sch.type = 'object';
-        sch.properties = {};
-        if (!properties) {
-            sch.additionalProperties = true;
+    public static toJsonSchema(doc?: Schema.Property | Schema.MultiProperty): JSONSchema.schema {
+        // Si no se pasa nada, devolver un objeto abierto
+        if (!doc) {
+            return { type: 'object', additionalProperties: true };
+        }
+        // Si es un MultiProperty (union)
+        if ('union' in doc) {
+            return {
+                anyOf: doc.union.map(sub => this.toJsonSchema(sub)),
+                ...(doc.nullable ? { anyOf: [...doc.union.map(sub => this.toJsonSchema(sub)), { type: 'null' }] } : {})
+            };
+        }
+        // Si es un objeto
+        if (doc.type === 'object') {
+            const sch: JSONSchema.schema = { type: doc.nullable ? ['object', 'null'] : 'object', properties: {} };
+            if (!sch.properties) sch.properties = {};
+            if (doc.properties) {
+                for (const key in doc.properties) {
+                    const prop = doc.properties[key];
+                    sch.properties[key] = this.toJsonSchema(prop);
+                    if (prop.required) {
+                        if (!sch.required) sch.required = [];
+                        sch.required.push(key);
+                    }
+                }
+            }
+            if (doc.allowAdditionalProperties === true) {
+                sch.additionalProperties = true;
+            } else if (doc.allowAdditionalProperties === false) {
+                sch.additionalProperties = false;
+            }
             return sch;
         }
-        for (const key in properties) {
-            const prop = properties[key];
-            if ('required' in prop && prop.required) {
-                if (!sch.required) sch.required = [];
-                sch.required.push(key);
-            }
-            sch.properties[key] = this.propertyToJsonSchema(prop);
+        // Si es un array
+        if (doc.type === 'array') {
+            const sch: JSONSchema.schema = { type: doc.nullable ? ['array', 'null'] : 'array' };
+            if ('items' in doc) sch.items = this.toJsonSchema(doc.items);
+            if (doc.minimum !== undefined) sch.minItems = doc.minimum;
+            if (doc.maximum !== undefined) sch.maxItems = doc.maximum;
+            return sch;
         }
-        return sch;
+        // Si es un string
+        if (doc.type === 'string') {
+            const sch: JSONSchema.schema = { type: doc.nullable ? ['string', 'null'] : 'string' };
+            if (doc.enum) sch.enum = [...doc.enum];
+            if (doc.minLength !== undefined) sch.minLength = doc.minLength;
+            if (doc.maxLength !== undefined) sch.maxLength = doc.maxLength;
+            if (doc.pattern) sch.pattern = doc.pattern instanceof RegExp ? doc.pattern.source : doc.pattern;
+            return sch;
+        }
+        // Si es un number
+        if (doc.type === 'number') {
+            const sch: JSONSchema.schema = { type: doc.nullable ? ['number', 'null'] : 'number' };
+            if (doc.minimum !== undefined) sch.minimum = doc.minimum;
+            if (doc.maximum !== undefined) sch.maximum = doc.maximum;
+            return sch;
+        }
+        // Si es un boolean
+        if (doc.type === 'boolean') {
+            return { type: doc.nullable ? ['boolean', 'null'] : 'boolean' };
+        }
+        // fallback
+        return {};
     }
     /**
      * Helper method to convert a single property (which can be a simple property or a union of properties) to its JSON Schema representation.
      * @param prop The property to convert to JSON Schema
      * @returns The JSON Schema representation of the input property
      */
-    protected static propertyToJsonSchema(prop: Schema.Property | Schema.MultiProperty): JSONSchema.schema {
-        let subSch: JSONSchema.schema = {};
-        if ('union' in prop) {
-            subSch.anyOf = prop.union.map(sub => this.propertyToJsonSchema(sub));
-            if (prop.nullable) subSch.anyOf.push({ type: 'null' });
-            return subSch;
-        }
-
-        const type = prop.type;
-        subSch.type = prop.nullable ? [type, 'null'] : type;
-
-        switch (type) {
-            case 'string':
-                if (prop.enum) subSch.enum = [...prop.enum];
-                if (prop.minLength !== undefined) subSch.minLength = prop.minLength;
-                if (prop.maxLength !== undefined) subSch.maxLength = prop.maxLength;
-                if (prop.pattern) subSch.pattern = prop.pattern.source;
-                break;
-
-            case 'number':
-                if (prop.minimum !== undefined) subSch.minimum = prop.minimum;
-                if (prop.maximum !== undefined) subSch.maximum = prop.maximum;
-                break;
-
-            case 'array':
-                if (prop.minimum !== undefined) subSch.minItems = prop.minimum;
-                if (prop.maximum !== undefined) subSch.maxItems = prop.maximum;
-                subSch.items = this.propertyToJsonSchema(prop.items);
-                break;
-
-            case 'object':
-                const objectSchema = this.toJsonSchema(prop.properties);
-                subSch = { ...objectSchema }; 
-                subSch.type = prop.nullable ? ['object', 'null'] : 'object';
-                break;
-        }
-
-        return subSch;
-    }
+    // propertyToJsonSchema ya no es necesario, la logica se fusiona en toJsonSchema
 }
 export namespace Introspection {}
 export default Introspection;
