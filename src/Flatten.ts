@@ -89,7 +89,9 @@ export namespace Flatten {
         ? true
         : T extends readonly any[]
             ? true
-            : false;
+            : string extends keyof T
+                ? true
+                : false;;
 
     type UndefinedToPartial<T extends object> = {
         [K in keyof T as undefined extends T[K] ? never : K]: T[K];
