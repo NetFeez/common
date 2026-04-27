@@ -301,7 +301,24 @@ export class Schema<
         doc: T,
         key: any
     ): key is keyof T { return key in doc; }
+    /**
+     * create a schema from an object definition
+     * @param obj the object definition to create the schema from
+     * @param allowAdditionalProperties whether to allow additional properties in objects (default: undefined, which means it will be determined by the presence of the 'properties' field in object definitions)
+     * @returns a new Schema instance based on the provided object definition
+     */
+    public static fromObject<const T extends Schema.PropertyMap>(obj: T): Schema.Utils.FromObject<T, undefined>;
+    public static fromObject<const T extends Schema.PropertyMap, const A extends boolean>(obj: T,allowAdditionalProperties: A): Schema.Utils.FromObject<T, A>;
+    public static fromObject(obj: Schema.PropertyMap, allowAdditionalProperties?: boolean): Schema<any> {
+        return new Schema({ type: 'object', properties: obj, allowAdditionalProperties });
+    }
 }
+
+const x = Schema.fromObject({
+    name: { type: 'string', required: true },
+    age: { type: 'number', default: 18 },
+}, true);
+const y = x.infer;
 
 export namespace Schema {
     export interface Document { [Key: string]: any; }
@@ -506,7 +523,7 @@ export namespace Schema {
                 ? ( Prettify<I & Flatten.Object<I, 10>> & Document )
                 : I
         );
-
+        export type FromObject<T extends PropertyMap, A extends boolean | undefined> = Schema<{ type: 'object'; properties: T; allowAdditionalProperties: A }>;
     }
 
     //
