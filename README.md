@@ -16,6 +16,7 @@
 
 ---
 
+
 ## 🧩 Package Structure
 
 - **src/Encoding.ts** — Encoding and decoding utilities.
@@ -24,6 +25,25 @@
 - **src/Object.ts** — Advanced object manipulation utilities.
 - **src/Time/** — Modules for date and time handling.
 - **src/schema/** — Core for schema validation, introspection, and definition (includes JSONSchema, validators, and typed errors).
+
+---
+
+## 📚 Schema System Documentation
+
+The schema engine is a central feature of this package. For advanced usage, type inference, and lifecycle details, see:
+
+- [docs/schema.md](docs/schema.md) — **Comprehensive guide to schema creation, validation, partial updates, and advanced processing.**
+
+This documentation covers:
+
+- How to define schemas from plain objects or programmatically
+- Supported property types and attributes
+- TypeScript inference utilities
+- Data processing (full and partial)
+- Error handling and lifecycle diagrams
+- JSON Schema export and interoperability
+
+> For a quick reference, see the attribute table and lifecycle diagram in [docs/schema.md](docs/schema.md).
 
 ---
 
@@ -66,8 +86,8 @@ Add this to your HTML:
 <script type="importmap">
 {
   "imports": {
-    "@netfeez/common": "https://netfeez.github.io/common/v2.0.1/common.js",
-    "@netfeez/common/": "https://netfeez.github.io/common/v2.0.1/"
+    "@netfeez/common": "https://netfeez.github.io/common/v3.0.0/common.js",
+    "@netfeez/common/": "https://netfeez.github.io/common/v3.0.0/"
   }
 }
 </script>
