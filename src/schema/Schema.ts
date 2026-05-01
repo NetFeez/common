@@ -76,6 +76,17 @@ export class Schema<
         return this.processProperty(data, this.root, 'root', partial);
     }
     /**
+     * process the provided data without type information, treating it as unknown.
+     * This is useful for cases where the input data is not already typed (e.g., after parsing JSON) and you want to validate and process it according to the schema.
+     * @param data the unknown data to process
+     * @param partial if the data is partial
+     * @returns the processed data with the correct type according to the schema
+     * @throws schemaError if the data is not valid according to the schema
+     */
+    public processUnknown(data: any, partial?: boolean): Schema.Infer<this['root']> {
+        return this.processProperty(data, this.root, 'root', partial);
+    }
+    /**
      * process the provided data as partial, meaning that it will only validate the provided properties and ignore the rest.
      * this is useful for validating data that is only meant to update a document, where only a subset of the properties are provided.
      * @param data the data to process
