@@ -6,7 +6,7 @@ set -euo pipefail
 
 # ====== Preparation process ======
 
-bash scripts/compile.sh
+bash scripts/build.sh
 
 # echo -e "\x1B[36m====== No publishes before refactor tests process ====== \x1B[0m";
 # exit 1
