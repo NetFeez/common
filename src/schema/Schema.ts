@@ -121,7 +121,7 @@ export class Schema<
         if (!firstKey) throw new SchemaError(`Invalid path: ${path}`);
         const root = this.root;
         let currentProp: Schema.Property | Schema.MultiProperty;
-        if ('union' in root) {
+        if (root.type === 'union') {
             let found: Schema.Property | Schema.MultiProperty | undefined;
             for (const prop of root.union) {
                 if (prop.type !== 'object') continue;
@@ -142,7 +142,7 @@ export class Schema<
         let isOpen = false;
 
         for (const subKey of subKeys) {
-            if ('union' in currentProp) {
+            if (currentProp.type === 'union') {
                 let foundChild: Schema.Property | Schema.MultiProperty | undefined;
                 let openObjectFound: Schema.Definition.Object | undefined;
 
@@ -166,7 +166,7 @@ export class Schema<
     }
     protected applyDefaults(prop: Schema.Property | Schema.MultiProperty, key: string): any {
         if ('default' in prop) return prop.default;
-        if ('union' in prop) {
+        if (prop.type === 'union') {
             for (const subProp of prop.union) {
                 try { return this.applyDefaults(subProp, key); }
                 catch { continue; }
@@ -204,7 +204,7 @@ export class Schema<
             }
             return this.applyDefaults(prop, key);
         }
-        if ('union' in prop) {
+        if (prop.type === 'union') {
             for (const subProp of prop.union) {
                 try { return this.processProperty(data, subProp, key, true); }
                 catch { continue; }
@@ -242,28 +242,40 @@ export class Schema<
      * @throws schemaError if the data is not valid
      */
     protected processObject(value: any, prop: Schema.Definition.Object, key: string, partial: boolean = false): any {
-        if (!prop.properties) return value;
-
+        const properties = prop.properties || {};
         const processed: any = {};
-        const properties = prop.properties;
 
-        for (const subKey in properties) {
-            const subProp = properties[subKey];
-            const subValue = value[subKey];
-            
-            const result = this.processProperty(subValue, subProp, `${key}.${subKey}`, partial);
-            if (result !== undefined) processed[subKey] = result;
+        if (value === null) {
+            if (prop.nullable) return null;
+            else throw new SchemaError(`Property ${key} is not nullable but null was provided`);
         }
 
-        if (prop.allowAdditionalProperties === true) {
-            return { ...value, ...processed };
-        } else if (prop.allowAdditionalProperties === false) {
-            for (const k in value) {
-                if (!(k in properties)) {
-                    throw new SchemaError(`Unknown property "${k}" at ${key}`);
+        const valueKeys = Object.keys(value);
+        const propertyKeys = Object.keys(properties);
+        const valueKeySet = new Set(valueKeys);
+
+        for (const valueKey of valueKeys) {
+            const subProp = properties[valueKey];
+            if (subProp) {
+                processed[valueKey] = this.processProperty(value[valueKey], subProp, `${key}.${valueKey}`, partial);
+                continue;
+            }
+            if (prop.allowAdditionalProperties === false) throw new SchemaError(`Unknown property "${valueKey}" at ${key}`);
+            if (prop.allowAdditionalProperties === true) {
+                if (prop.recordValueType) {
+                    processed[valueKey] = this.processProperty(value[valueKey], prop.recordValueType, `${key}.${valueKey}`, partial);
+                } else {
+                    processed[valueKey] = value[valueKey];
                 }
             }
-        } else return processed;
+        }
+        for (const propKey of propertyKeys) {
+            if (!valueKeySet.has(propKey)) {
+                const result = this.processProperty(undefined, properties[propKey], `${key}.${propKey}`, partial);
+                if (result !== undefined) processed[propKey] = result;
+            }
+        }
+        return processed;
     }
     /**
      * validate a array
@@ -273,7 +285,10 @@ export class Schema<
      * @throws schemaError if the data is not valid
      */
     protected validateArray(value: any, prop: Schema.Definition.Array, key: string) {
-        if (value == null && prop.nullable === true) return;
+        if (value === null) {
+            if (prop.nullable) return null;
+            else throw new SchemaError(`Property ${key} is not nullable but null was provided`);
+        }
         if (!Array.isArray(value)) throw new SchemaError(`Property ${key} must be an array`);
         if (prop.minimum !== undefined && value.length < prop.minimum) {
             throw new SchemaError(`Property ${key} must have at least ${prop.minimum} items`);
@@ -325,12 +340,6 @@ export class Schema<
     }
 }
 
-const x = Schema.fromObject({
-    name: { type: 'string', required: true },
-    age: { type: 'number', default: 18 },
-}, true);
-const y = x.infer;
-
 export namespace Schema {
     export interface Document { [Key: string]: any; }
     
@@ -370,6 +379,7 @@ export namespace Schema {
 
         export interface Object extends Base<'object'> {
             properties?: Map;
+            recordValueType?: Property | MultiProperty;
             allowAdditionalProperties?: boolean;
         }
 
@@ -400,6 +410,7 @@ export namespace Schema {
          * This type is essential for defining flexible schemas that can accommodate different types of data for a single property.
          */
         export interface MultiProperty<T extends Property = Property> {
+            type: 'union';
             union: T[];
             required?: boolean;
             nullable?: boolean;
@@ -419,6 +430,34 @@ export namespace Schema {
     // ====== INFERENCE LOGIC ======
     //
     export namespace Infer {
+        namespace Support {
+            /**
+             * Generate the type for additional properties in an object schema when 'allowAdditionalProperties' is true, based on the 'recordValueType' definition.
+             * - If 'recordValueType' is defined and is a valid property type, the additional properties will have the type defined by 'recordValueType'.
+             * - If 'recordValueType' is not defined, the additional properties will be of type 'any'.
+             * This type is used internally to determine the shape of additional properties allowed in an object schema when 'allowAdditionalProperties' is enabled.
+             * @param P - The object property definition to evaluate
+             * @param M - The mode of inference (complete, process, partial) that determines how required and optional properties are treated for the record value type
+             * @returns The TypeScript type representing the additional properties allowed by the schema based on the provided definition
+             */
+            export type RecordFallback<P extends Definition.Object, M extends Mode> =
+                P['recordValueType'] extends Property | MultiProperty
+                    ? { [key: string]: Wrap<P['recordValueType'], M> }
+                    : { [key: string]: any };
+            /**
+             * Generate the type for additional properties in an object schema based on the 'allowAdditionalProperties' flag and the 'recordValueType' definition.
+             * - If 'allowAdditionalProperties' is true and 'recordValueType' is defined, the additional properties will have the type defined by 'recordValueType'.
+             * - If 'allowAdditionalProperties' is true but 'recordValueType' is not defined, the additional properties will be of type 'any'.
+             * - If 'allowAdditionalProperties' is false or not set, no additional properties are allowed, and this type will be an empty object.
+             * @param P - The object property definition to evaluate
+             * @param M - The mode of inference (complete, process, partial) that determines how required and optional properties are treated for the record value type
+             * @returns The TypeScript type representing the additional properties allowed by the schema based on the provided definition
+             */
+            export type AdditionalProps<P extends Definition.Object, M extends Mode> =
+                P['allowAdditionalProperties'] extends true
+                    ? RecordFallback<P, M>
+                    : {};
+        }
         export type Mode = 'partial' | 'process' | 'complete';
 
         /**
@@ -434,8 +473,8 @@ export namespace Schema {
             : P extends Definition.Boolean ? boolean
             : P extends Definition.Object ? (
                 P['properties'] extends PropertyMap 
-                    ? (Mapping.Resolve<P['properties'], M> & (P['allowAdditionalProperties'] extends true ? { [key: string]: any } : {}))
-                    : Record<string, any>
+                    ? (Mapping.Resolve<P['properties'], M> & Support.AdditionalProps<P, M>)
+                    : Support.RecordFallback<P, M>
             )
             : P extends Definition.Array ? GetPropertyType<P['items'], M>[]
             : never
@@ -502,8 +541,8 @@ export namespace Schema {
             P extends Definition.Object
                 ? (
                     P['properties'] extends PropertyMap
-                        ? (Mapping.Resolve<P['properties'], M> & (P['allowAdditionalProperties'] extends true ? { [key: string]: any } : {}))
-                        : Record<string, any>
+                        ? (Mapping.Resolve<P['properties'], M> & Support.AdditionalProps<P, M>)
+                        : Support.RecordFallback<P, M>
                 )
                 : Wrap<P, M>
         );

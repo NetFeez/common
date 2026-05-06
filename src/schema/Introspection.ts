@@ -19,7 +19,7 @@ export class Introspection {
         // Permite recibir tanto PropertyMap como Property/MultiProperty
         const uniques: string[] = [];
         // Si es un MultiProperty (union)
-        if ('union' in doc) {
+        if (doc.type === 'union') {
             for (const subProp of doc.union) {
                 uniques.push(...this.listUniques(subProp, parentKey));
             }
@@ -47,7 +47,7 @@ export class Introspection {
             return { type: 'object', additionalProperties: true };
         }
         // Si es un MultiProperty (union)
-        if ('union' in doc) {
+        if (doc.type === 'union') {
             return {
                 anyOf: doc.union.map(sub => this.toJsonSchema(sub)),
                 ...(doc.nullable ? { anyOf: [...doc.union.map(sub => this.toJsonSchema(sub)), { type: 'null' }] } : {})
@@ -68,7 +68,11 @@ export class Introspection {
                 }
             }
             if (doc.allowAdditionalProperties === true) {
-                sch.additionalProperties = true;
+                if (doc.recordValueType) {
+                    sch.additionalProperties = this.toJsonSchema(doc.recordValueType);
+                } else {
+                    sch.additionalProperties = true;
+                }
             } else if (doc.allowAdditionalProperties === false) {
                 sch.additionalProperties = false;
             }
@@ -102,15 +106,8 @@ export class Introspection {
         if (doc.type === 'boolean') {
             return { type: doc.nullable ? ['boolean', 'null'] : 'boolean' };
         }
-        // fallback
         return {};
     }
-    /**
-     * Helper method to convert a single property (which can be a simple property or a union of properties) to its JSON Schema representation.
-     * @param prop The property to convert to JSON Schema
-     * @returns The JSON Schema representation of the input property
-     */
-    // propertyToJsonSchema ya no es necesario, la logica se fusiona en toJsonSchema
 }
 export namespace Introspection {}
 export default Introspection;

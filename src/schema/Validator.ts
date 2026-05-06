@@ -28,7 +28,7 @@ export class Validator {
      * @param key The key of the property, used for error messages
      */
     public static validateProperty(prop: Schema.Property | Schema.MultiProperty, key: string): void {
-        if ('union' in prop) {
+        if (prop.type === 'union') {
             if (!Array.isArray(prop.union) || prop.union.length === 0) throw new SchemaError(`Property '${key}' union must be a non-empty array`);
             for (const index in prop.union) {
                 const subProp = prop.union[index];
@@ -199,7 +199,7 @@ export class Validator {
             if (value === undefined && !('required' in prop && prop.required)) return;
             throw new SchemaError(`Property ${key} cannot be ${value}`);
         }
-        if ('union' in prop) {
+        if (prop.type === 'union') {
             const errors: string[] = [];
             const isValid = prop.union.some((subProp) => {
                 try { this.validateValue(value, subProp, key); return true; }
