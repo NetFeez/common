@@ -70,9 +70,9 @@ export class Schema<
      * @returns the processed data
      * @throws schemaError if the data is not valid
      */
-    public processData(data: Schema.Infer<this['root']>, partial?: boolean): Schema.Infer<this['root']>;
-    public processData(data: Schema.InferToProcess<this['root']>, partial?: boolean): Schema.Infer<this['root']>;
-    public processData(data: any, partial?: boolean): Schema.Infer<this['root']> {
+    public processData(data: this['infer'], partial?: boolean): this['infer'];
+    public processData(data: this['inferToProcess'], partial?: boolean): this['infer'];
+    public processData(data: any, partial?: boolean): this['infer'] {
         return this.processProperty(data, this.root, 'root', partial);
     }
     /**
@@ -83,7 +83,7 @@ export class Schema<
      * @returns the processed data with the correct type according to the schema
      * @throws schemaError if the data is not valid according to the schema
      */
-    public processUnknown(data: any, partial?: boolean): Schema.Infer<this['root']> {
+    public processUnknown(data: any, partial?: boolean): this['infer'] {
         return this.processProperty(data, this.root, 'root', partial);
     }
     /**
