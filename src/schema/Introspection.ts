@@ -67,14 +67,12 @@ export class Introspection {
                     }
                 }
             }
-            if (doc.allowAdditionalProperties === true) {
-                if (doc.recordValueType) {
-                    sch.additionalProperties = this.toJsonSchema(doc.recordValueType);
-                } else {
-                    sch.additionalProperties = true;
-                }
-            } else if (doc.allowAdditionalProperties === false) {
+            if (doc.allowAdditionalProperties === false) {
                 sch.additionalProperties = false;
+            } else if (doc.allowAdditionalProperties) {
+                sch.additionalProperties = doc.allowAdditionalProperties !== true
+                    ? this.toJsonSchema(doc.allowAdditionalProperties)
+                    : true;
             }
             return sch;
         }
