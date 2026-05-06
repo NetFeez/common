@@ -15,6 +15,10 @@
     "email": "netfeez.dev@gmail.com",
     "url": "https://github.com/NetFeez"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NetFeez/common.git"
+  },
   "scripts": {
     "publish": "bash scripts/publish.sh",
     "build": "bash scripts/build.sh",
