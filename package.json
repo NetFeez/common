@@ -17,7 +17,7 @@
   },
   "scripts": {
     "publish": "bash scripts/publish.sh",
-    "compile": "bash scripts/compile.sh",
+    "build": "bash scripts/build.sh",
     "dev": "bash scripts/dev.sh",
     "dev.publish": "bash scripts/publish.sh --dev"
   },
