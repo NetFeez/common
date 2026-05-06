@@ -379,10 +379,17 @@ export namespace Schema {
 
         export interface Boolean extends Base<'boolean'> {}
 
-        export interface Object extends Base<'object'> {
-            properties?: Map;
+        export interface ObjectProp extends Base<'object'> {
+            properties: Map;
             allowAdditionalProperties?: boolean | Property | MultiProperty;
         }
+
+        export interface Record extends Base<'object'> {
+            properties?: never;
+            allowAdditionalProperties: true | Property | MultiProperty;
+        }
+
+        export type Object = ObjectProp | Record;
 
         export interface Array extends Base<'array'> {
             items: Property;
