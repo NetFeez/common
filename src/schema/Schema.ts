@@ -173,18 +173,27 @@ export class Schema<
             }
             if (prop.nullable) return null;
             throw new SchemaError(`Property ${key} does not match any of the allowed types in the union`);
-        } else if (prop.type !== 'object' || !prop.properties) {
+        }
+        else if (prop.type !== 'object' || !prop.properties) {
             if (prop.nullable) return null;
             if (prop.required) throw new SchemaError(`Property ${key} is required but not provided`);
-        } else {
-            if (!prop.properties) return {};
+        }
+        else {
+            if (prop.required) throw new SchemaError(`Property ${key} is required but not provided`);
             const handler = new Schema(prop);
             const result: any = {};
             for (const subKey in prop.properties) {
                 const subProp = prop.properties[subKey];
-                const value = handler.applyDefaults(subProp, `${key}.${subKey}`);
+                let value: any;
+                try {
+                    value = handler.applyDefaults(subProp, `${key}.${subKey}`);
+                } catch (err) {
+                    if ('required' in subProp && subProp.required) return undefined;
+                    continue;
+                }
                 if (value !== undefined) result[subKey] = value;
-            } return result;
+            }
+            return Object.keys(result).length ? result : undefined;
         }
     }
     /**
@@ -566,7 +575,28 @@ export namespace Schema {
     //
     export namespace Utils {
         export type IsRequired<T> = T extends { required: true } ? true : false;
-        export type HasDefault<T> = T extends { default: any } ? true : false;
+        export type AnyChildHasDefault<P extends PropertyMap> = {
+            [K in keyof P]: HasDefault<P[K]> extends true ? K : never
+        }[keyof P] extends never ? false : true;
+
+        export type RequiredChildMissingDefault<P extends PropertyMap> = {
+            [K in keyof P]: Utils.IsRequired<P[K]> extends true ? (HasDefault<P[K]> extends true ? never : K) : never
+        }[keyof P] extends never ? false : true;
+
+        export type HasDefaultEx<T> =
+            T extends { default: any } ? true :
+            T extends { type: 'union'; union: infer U extends Property[] } ? (
+                U[number] extends infer M ? (HasDefault<M & Property> extends true ? true : false) : false
+            ) :
+            T extends { type: 'object'; properties: infer P } ? (
+                P extends PropertyMap ? (
+                    AnyChildHasDefault<P> extends true ? (
+                        RequiredChildMissingDefault<P> extends true ? false : true
+                    ) : false
+                ) : false
+            ) : false;
+
+        export type HasDefault<T> = HasDefaultEx<T>;
         export type IsNullable<T> = T extends { nullable: true } ? true : false;
         export type DefaultValue<T> = T extends { default: infer D } ? D : never;
         export type Prettify<T> = { [K in keyof T]: T[K] } & {};
