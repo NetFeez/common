@@ -23,7 +23,8 @@
     "publish": "bash scripts/publish.sh",
     "build": "bash scripts/build.sh",
     "dev": "bash scripts/dev.sh",
-    "dev.publish": "bash scripts/publish.sh --dev"
+    "dev.publish": "bash scripts/publish.sh --dev",
+    "prepublishOnly": "npm run build"
   },
   "files": [
     "package.json",
