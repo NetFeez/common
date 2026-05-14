@@ -94,23 +94,18 @@ export class Events<EventMap extends Events.EventMap = Events.EventMap> {
         const onceCount     = this.onceListeners[name]?.size ?? 0;
         return listenerCount + onceCount;
     }
-    public static createEmitter<EventMap extends Events.EventMap = Events.EventMap>(): PublicEmitter<EventMap> {
-        return new PublicEmitter<EventMap>();
+    public static createEmitter<EventMap extends Events.EventMap = Events.EventMap>(): EventsEmitter<EventMap> {
+        return new EventsEmitter<EventMap>();
     }
 }
-export class PublicEmitter<EventMap extends Events.EventMap = Events.EventMap> extends Events<EventMap> {
-    public override emit<E extends string & keyof EventMap>(...event: [name: E, ...args: EventMap[E]]): void {
-        super.emit(...event);
-    }
-    /**
-     * Returns the emitter itself, allowing to emit events from outside the class.
-     * @returns The emitter itself.
-     */
-    public get emitter(): Events<EventMap> { return this; }
+export class EventsEmitter<EventMap extends Events.EventMap = Events.EventMap> extends Events<EventMap> {
+    public override emit = super.emit;
+    /** Returns the EventManager as an Events instance, allowing for the registration of listeners without exposing the emit method. */
+    public get listenerOnly(): Events<EventMap> { return this; }
 }
-export namespace PublicEmitter {}
+export namespace EventsEmitter {}
 export namespace Events {
-    export import Emitter = PublicEmitter;
+    export import Emitter = EventsEmitter;
 
     export type Listener<T extends any[]> = (...args: T) => void;
     export type ListenerList<eventMap extends EventMap> = {
