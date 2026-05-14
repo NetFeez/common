@@ -3,7 +3,7 @@ import Events from "./Events.js";
 export class BufferedEvents<EventMap extends Events.EventMap> extends Events<EventMap> {
     private protected: BufferedEvents.Buffer<EventMap> = {};
     protected vBuffering: boolean = true
-    protected vAutoFlush: boolean = true;
+    protected vAutoFlush: boolean = false;
 
     public get buffering(): boolean { return this.vBuffering; }
     public set buffering(value: boolean) { this.vBuffering = value; }
