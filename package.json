@@ -19,10 +19,10 @@
     "url": "https://github.com/NetFeez/common.git"
   },
   "scripts": {
-    "publish": "bash scripts/publish.sh",
-    "build": "bash scripts/build.sh",
     "dev": "bash scripts/dev.sh",
-    "dev.publish": "bash scripts/publish.sh --dev",
+    "build": "bash scripts/build.sh",
+    "release": "bash scripts/release.sh",
+    "release:dev": "bash scripts/release.sh --dev",
     "prepublishOnly": "npm run build"
   },
   "files": [
