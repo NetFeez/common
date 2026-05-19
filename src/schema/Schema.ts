@@ -401,7 +401,7 @@ export namespace Schema {
         export type Object = ObjectProp | Record;
 
         export interface Array extends Base<'array'> {
-            items: Property;
+            items: Property | MultiProperty;
             minimum?: number;
             maximum?: number;
         }
@@ -492,8 +492,20 @@ export namespace Schema {
                     ? Mapping.Resolve<P['properties'], M>
                     : {}
             ) & Support.AdditionalProps<P, M>
-            : P extends Definition.Array ? GetPropertyType<P['items'], M>[]
+            : P extends Definition.Array ? GetItemType<P, M>[]
             : never
+        );
+        /**
+         * Get the TypeScript type corresponding to the items of an array property definition, taking into account unions, nullability, and default values.
+         * This type is used as a helper for GetPropertyType when inferring the type of an array property, allowing it to correctly resolve the type of the items in the array based on the provided schema definition.
+         * @param P - The array property definition to infer the item type from.
+         * @param M - The mode of inference (complete, process, partial) that determines how required and optional properties are treated for the item type.
+         * @returns - The inferred TypeScript type corresponding to the items of the array property definition.
+         */
+        export type GetItemType<P extends Definition.Array, M extends Mode = 'complete'> = (
+            P['items'] extends Property
+            ? GetPropertyType<P['items'], M>
+            : GetBaseType<P['items'], M>
         );
 
         /**
