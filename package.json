@@ -1,13 +1,13 @@
 {
   "name": "@netfeez/common",
   "type": "module",
-  "version": "4.1.0",
+  "version": "4.1.1",
   "description": "The universal core of the NetFeez ecosystem. Agnostic utilities and schema validation for Vortez (Server) and Vizui (Web).",
   "license": "Apache-2.0",
   "main": "build/common.js",
   "exports": {
-    ".": { "import": "./build/common.js" },
-    "./*": { "import": "./build/*" }
+    ".": { "import": "./build/common.js", "types": "./build/common.d.ts" },
+    "./*": { "import": "./build/*", "types": "./build/*" }
   },
   "author": {
     "name": "NetFeez",
