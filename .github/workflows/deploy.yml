@@ -31,7 +31,7 @@ jobs:
       - name: Install and Build
         run: |
           npm install
-          npm run compile
+          npm run build
 
       - name: Manual Deploy to gh-pages
         run: |
