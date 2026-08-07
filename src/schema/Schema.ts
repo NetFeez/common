@@ -196,6 +196,25 @@ export class Schema<
             return Object.keys(result).length ? result : undefined;
         }
     }
+    protected validatePropertyMath(data: any, prop: Schema.Property | Schema.MultiProperty, checkDefaults: boolean = true): boolean {
+        if (data === null) return !!prop.nullable;
+        if (prop.type === 'union') return prop.union.some(subProp => this.validatePropertyMath(data, subProp, checkDefaults));
+        if (prop.type !== 'object' && prop.type !== 'array') return typeof data === prop.type;
+        if (prop.type === 'object' && prop.properties) {
+            if (typeof data !== 'object' || data === null || Array.isArray(data)) return false;
+            for (const key in prop.properties) {
+                const subProp = prop.properties[key];
+                const hasKey = key in data;
+                if (!hasKey) {
+                    if (checkDefaults && 'default' in subProp) continue;
+                    if (subProp.required) return false;
+                } else { if (!this.validatePropertyMath(data[key], subProp, checkDefaults)) return false; }
+            }
+            return true;
+        }
+        if (prop.type === 'array' && Array.isArray(data)) return data.every(item => this.validatePropertyMath(item, prop.items, checkDefaults));
+        return true;
+    }
     /**
      * process a property
      * @param data the data to process
@@ -214,8 +233,10 @@ export class Schema<
             return this.applyDefaults(prop, key);
         }
         if (prop.type === 'union') {
-            for (const subProp of prop.union) {
-                try { return this.processProperty(data, subProp, key, true); }
+            const matches = prop.union.filter(subProp => this.validatePropertyMath(data, subProp, true));
+            const fullMatches = matches.filter(subProp => this.validatePropertyMath(data, subProp, false));
+            for (const subProp of fullMatches.length ? fullMatches : matches) {
+                try { return this.processProperty(data, subProp, key, partial); }
                 catch { continue; }
             }
             throw new SchemaError(`Property ${key} does not match any of the allowed types in the union`);
